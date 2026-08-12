@@ -8,10 +8,8 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
-from .ao_reach.connection_config import normalize_reach_app_id
 from .const import (
     CONF_API_TOKEN,
     CONF_APP_ID,
@@ -32,11 +30,16 @@ from .const import (
     DOMAIN,
 )
 
+# Keep config-flow imports free of aiohttp / SessionBridge (package __init__ is lazy).
+from .ao_reach.connection_config import normalize_reach_app_id
+
 
 class ComstarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Comstar."""
+
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
 
@@ -75,27 +78,46 @@ class ComstarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return ComstarOptionsFlow()
 
 
-class ComstarOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+class ComstarOptionsFlow(config_entries.OptionsFlow):
+    """Handle Comstar options (uses HA-injected config_entry)."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        opts = self.config_entry.options
-        data = self.config_entry.data
+
+        entry = self.config_entry
+        opts = entry.options
+        data = entry.data
         schema = vol.Schema(
             {
-                vol.Optional(CONF_API_TOKEN, default=opts.get(CONF_API_TOKEN, data.get(CONF_API_TOKEN, ""))): str,
+                vol.Optional(
+                    CONF_API_TOKEN,
+                    default=opts.get(CONF_API_TOKEN, data.get(CONF_API_TOKEN, "")),
+                ): str,
                 vol.Optional(CONF_SPEECH_TOKEN, default=opts.get(CONF_SPEECH_TOKEN, "")): str,
                 vol.Optional(CONF_STT_OVERRIDE, default=opts.get(CONF_STT_OVERRIDE, "")): str,
                 vol.Optional(CONF_TTS_OVERRIDE, default=opts.get(CONF_TTS_OVERRIDE, "")): str,
                 vol.Optional(
                     CONF_DEFAULT_AGENT,
-                    default=opts.get(CONF_DEFAULT_AGENT, data.get(CONF_DEFAULT_AGENT, DEFAULT_AGENT)),
+                    default=opts.get(
+                        CONF_DEFAULT_AGENT, data.get(CONF_DEFAULT_AGENT, DEFAULT_AGENT)
+                    ),
                 ): str,
-                vol.Optional(CONF_ENABLE_GOOGLE, default=opts.get(CONF_ENABLE_GOOGLE, False)): cv.boolean,
-                vol.Optional(CONF_ENABLE_NEXTCLOUD, default=opts.get(CONF_ENABLE_NEXTCLOUD, False)): cv.boolean,
-                vol.Optional(CONF_ENABLE_LDAP, default=opts.get(CONF_ENABLE_LDAP, False)): cv.boolean,
-                vol.Optional(CONF_ENABLE_VISION, default=opts.get(CONF_ENABLE_VISION, False)): cv.boolean,
-                vol.Optional(CONF_ENABLE_TERMINAL, default=opts.get(CONF_ENABLE_TERMINAL, False)): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_GOOGLE, default=opts.get(CONF_ENABLE_GOOGLE, False)
+                ): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_NEXTCLOUD, default=opts.get(CONF_ENABLE_NEXTCLOUD, False)
+                ): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_LDAP, default=opts.get(CONF_ENABLE_LDAP, False)
+                ): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_VISION, default=opts.get(CONF_ENABLE_VISION, False)
+                ): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_TERMINAL, default=opts.get(CONF_ENABLE_TERMINAL, False)
+                ): cv.boolean,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

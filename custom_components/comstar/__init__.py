@@ -6,16 +6,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .announce import announce as do_announce
-from .catalog import CatalogStore
 from .const import (
     CONF_API_TOKEN,
     CONF_APP_ID,
@@ -37,14 +33,10 @@ from .const import (
     DEFAULT_TTL,
     DOMAIN,
 )
-from .health import HealthService
-from .identity import resolve_identity
-from .mcp_bootstrap import ComstarMcpBootstrap
-from .pairing import AoPairingService
-from .reach_session import ReachSessionManager
 
 _LOGGER = logging.getLogger(__name__)
 
+# Keep module import light so config_flow discovery does not pull aiohttp/Reach.
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -53,6 +45,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # Heavy imports deferred until the integration is actually set up.
+    import yaml
+
+    from .announce import announce as do_announce
+    from .catalog import CatalogStore
+    from .health import HealthService
+    from .identity import resolve_identity
+    from .mcp_bootstrap import ComstarMcpBootstrap
+    from .pairing import AoPairingService
+    from .reach_session import ReachSessionManager
+
     hass.data.setdefault(DOMAIN, {})
 
     stock_root = Path(__file__).parent / "overlays"
@@ -115,7 +118,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     enroll_token = (entry.data.get("enroll_token") or "").strip()
     if enroll_token:
         await pairing.enroll(enroll_token)
-        # Clear one-time token from entry data
         hass.config_entries.async_update_entry(
             entry, data={k: v for k, v in entry.data.items() if k != "enroll_token"}
         )
@@ -167,6 +169,8 @@ def _runtime(hass: HomeAssistant) -> dict[str, Any]:
 
 
 async def _rebuild_overlay(hass: HomeAssistant, runtime: dict[str, Any]) -> None:
+    from .catalog import CatalogStore
+
     catalog: CatalogStore = runtime["catalog"]
     merged: Path = runtime["merged_root"]
     await hass.async_add_executor_job(catalog.ensure_merged_overlay, merged)
@@ -179,6 +183,11 @@ async def _rebuild_overlay(hass: HomeAssistant, runtime: dict[str, Any]) -> None
 async def _async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, "probe"):
         return
+
+    import yaml
+
+    from .announce import announce as do_announce
+    from .identity import resolve_identity
 
     async def svc_pair(call: ServiceCall) -> None:
         runtime = _runtime(hass)
@@ -245,7 +254,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def svc_catalog_list(call: ServiceCall) -> None:
         runtime = _runtime(hass)
         entries = runtime["catalog"].list_entries(call.data["kind"])
-        hass.bus.async_fire(f"{DOMAIN}_catalog_list", {"kind": call.data["kind"], "entries": entries})
+        hass.bus.async_fire(
+            f"{DOMAIN}_catalog_list", {"kind": call.data["kind"], "entries": entries}
+        )
 
     async def svc_catalog_get(call: ServiceCall) -> None:
         runtime = _runtime(hass)
@@ -260,7 +271,12 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         await _rebuild_overlay(hass, runtime)
         hass.bus.async_fire(
             f"{DOMAIN}_catalog_upsert",
-            {"ok": True, "path": str(path), "kind": call.data["kind"], "id": call.data["id"]},
+            {
+                "ok": True,
+                "path": str(path),
+                "kind": call.data["kind"],
+                "id": call.data["id"],
+            },
         )
 
     async def svc_catalog_delete(call: ServiceCall) -> None:

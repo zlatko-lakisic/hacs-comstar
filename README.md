@@ -1,5 +1,9 @@
 # HACS Comstar
 
+<p align="center">
+  <img src="images/icon.png" alt="Comstar" width="96">
+</p>
+
 Home Assistant Assist frontend for [Agentic Orchestration](https://github.com/zlatko-lakisic/agentic-orchestration) via **AO Reach** — the same framework used by the [Comstar](https://github.com/zlatko-lakisic/comstar) Pi terminal.
 
 ## Features

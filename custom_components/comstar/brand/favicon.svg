@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="COMSTAR">
+  <!-- Brand favicon: dark field, cyan starburst, amber core. Reads at 16px. -->
+  <rect width="64" height="64" rx="12" fill="#06080B"/>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3DDCFF" stop-opacity="0.22"/>
+      <stop offset="70%" stop-color="#3DDCFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="26" fill="url(#glow)"/>
+  <g fill="none" stroke="#3DDCFF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Primary axes -->
+    <path d="M32 6 L32 58" stroke-width="2.6"/>
+    <path d="M6 32 L58 32" stroke-width="2.6"/>
+    <!-- Diagonals -->
+    <path d="M12.5 12.5 L51.5 51.5" stroke-width="1.9" stroke-opacity="0.85"/>
+    <path d="M51.5 12.5 L12.5 51.5" stroke-width="1.9" stroke-opacity="0.85"/>
+    <!-- Faceted diamond -->
+    <path d="M32 14 L46 32 L32 50 L18 32 Z" stroke-width="2.2" fill="#3DDCFF" fill-opacity="0.16"/>
+    <path d="M32 22 L40 32 L32 42 L24 32 Z" stroke-width="1.6" fill="none"/>
+  </g>
+  <circle cx="32" cy="32" r="4.2" fill="#F0A202"/>
+  <circle cx="32" cy="32" r="1.6" fill="#FFE6A8"/>
+</svg>

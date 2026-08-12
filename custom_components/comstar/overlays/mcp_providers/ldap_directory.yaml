@@ -1,0 +1,27 @@
+# COMSTAR LDAP MCP — AO catalog (hosted on Ada / AI server).
+# Session open must not depend on this MCP (ADR 0005).
+#
+# On Ada:
+#   1. Run directory_sidecar (:8780) + ldap_mcp (:8794)
+#   2. Set COMSTAR_LDAP_MCP_URL=http://127.0.0.1:8794/mcp in AO env
+#   3. Place this file under AO config/mcp_providers/ (or EXTRA path) and restart
+id: ldap_directory
+description: FreeIPA COMSTAR person lookup via directory sidecar
+capabilities: >
+  lookup_user by uid; list_comstar_users for enrolled comstarPerson entries.
+  Biometric face/voice resolve stays on the Pi bridge sidecar path.
+good_for: directory, ldap, freeipa, who is, user lookup, household roster
+planner_hint: Use for person directory questions; never for session identity.
+user_goal_keywords:
+  - directory
+  - ldap
+  - freeipa
+  - userid
+  - who is enrolled
+  - household
+
+guest_allowed: false
+required_env:
+  - COMSTAR_LDAP_MCP_URL
+streamable_http:
+  url: "${COMSTAR_LDAP_MCP_URL}"

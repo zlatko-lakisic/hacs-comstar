@@ -1,0 +1,150 @@
+pair_ao:
+  name: Pair AO
+  description: Enroll mTLS with a one-time Ada enroll token.
+  fields:
+    enroll_token:
+      required: true
+      example: "one-time-token"
+      selector:
+        text:
+    client_name:
+      required: false
+      example: "comstar-ha"
+      selector:
+        text:
+
+clear_certs:
+  name: Clear local certs
+  description: Delete local mTLS PEMs (does not revoke on AO).
+
+probe:
+  name: Probe AO
+  description: GET engine /health with client certificate.
+
+refresh_status:
+  name: Refresh status
+  description: Re-inspect pairing and update diagnostic entities.
+
+set_api_token:
+  name: Set API token
+  description: Rotate minted Bearer token (appId comstar-ha).
+  fields:
+    api_token:
+      required: true
+      selector:
+        text:
+
+reset_session:
+  name: Reset session
+  description: Stop Reach session and clear remote overlay.
+
+refresh_overlay:
+  name: Refresh overlay
+  description: Re-register stock+user catalogs on the live Reach session.
+
+announce:
+  name: Announce
+  description: Proactive spoken message via AO TTS when available.
+  fields:
+    message:
+      required: true
+      selector:
+        text:
+
+direct_agent:
+  name: Direct agent
+  description: Run a client.* agent via Reach.
+  fields:
+    text:
+      required: true
+      selector:
+        text:
+    agent_id:
+      required: false
+      example: "client.voice_responder"
+      selector:
+        text:
+    mcp_provider_ids:
+      required: false
+      selector:
+        object:
+
+run_harness:
+  name: Run harness
+  description: Best-effort harness pack execution (records path for operator follow-up).
+  fields:
+    harness_id:
+      required: true
+      selector:
+        text:
+
+catalog_list:
+  name: Catalog list
+  fields:
+    kind:
+      required: true
+      selector:
+        select:
+          options:
+            - agent_providers
+            - mcp_providers
+            - agent_skills
+            - agent_harnesses
+            - harnesses
+
+catalog_get:
+  name: Catalog get
+  fields:
+    kind:
+      required: true
+      selector:
+        text:
+    id:
+      required: true
+      selector:
+        text:
+
+catalog_upsert:
+  name: Catalog upsert
+  fields:
+    kind:
+      required: true
+      selector:
+        text:
+    id:
+      required: true
+      selector:
+        text:
+    yaml:
+      required: true
+      selector:
+        text:
+          multiline: true
+
+catalog_delete:
+  name: Catalog delete
+  fields:
+    kind:
+      required: true
+      selector:
+        text:
+    id:
+      required: true
+      selector:
+        text:
+
+catalog_enable:
+  name: Catalog enable
+  fields:
+    kind:
+      required: true
+      selector:
+        text:
+    id:
+      required: true
+      selector:
+        text:
+    enabled:
+      required: true
+      selector:
+        boolean:

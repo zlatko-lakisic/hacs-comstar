@@ -1,0 +1,63 @@
+{
+  "title": "Comstar",
+  "config": {
+    "step": {
+      "user": {
+        "title": "HACS Comstar — AO pairing",
+        "description": "Connect Home Assistant Assist to Agentic Orchestration via AO Reach (engine :8765).",
+        "data": {
+          "engine_url": "AO engine URL (https://host:8765)",
+          "api_token": "Minted Bearer token (appId comstar-ha)",
+          "app_id": "Reach appId",
+          "ttl_seconds": "Overlay TTL seconds",
+          "enroll_token": "Optional one-time mTLS enroll token",
+          "default_agent": "Default client.* agent for Assist"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Comstar instance is allowed."
+    },
+    "error": {
+      "cannot_connect": "Could not reach AO engine",
+      "invalid_app_id": "Invalid Reach appId",
+      "enroll_failed": "mTLS enroll failed"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Comstar options",
+        "data": {
+          "api_token": "Minted Bearer token",
+          "speech_token": "Speech sidecar token",
+          "stt_base_url_override": "STT base URL override",
+          "tts_base_url_override": "TTS base URL override",
+          "default_agent": "Default Assist agent",
+          "enable_google_tunnel": "Enable Google Workspace tunnel MCP",
+          "enable_nextcloud_tunnel": "Enable Nextcloud tunnel MCP",
+          "enable_ldap_tunnel": "Enable LDAP tunnel MCP",
+          "enable_vision_tunnel": "Enable vision tunnel MCP",
+          "enable_terminal_tunnel": "Enable terminal tunnel MCP (off by default; risky)"
+        }
+      }
+    }
+  },
+  "services": {
+    "pair_ao": { "name": "Pair AO", "description": "Enroll mTLS with a one-time token." },
+    "clear_certs": { "name": "Clear local certs", "description": "Delete local mTLS PEMs (does not revoke on AO)." },
+    "probe": { "name": "Probe AO", "description": "GET engine /health with client cert." },
+    "refresh_status": { "name": "Refresh status", "description": "Re-inspect pairing and update diagnostic entities." },
+    "set_api_token": { "name": "Set API token", "description": "Rotate minted Bearer token." },
+    "reset_session": { "name": "Reset session", "description": "Clear remote overlay / local session." },
+    "refresh_overlay": { "name": "Refresh overlay", "description": "Re-register session overlay catalogs." },
+    "announce": { "name": "Announce", "description": "Speak a proactive TTS message." },
+    "direct_agent": { "name": "Direct agent", "description": "Run a client.* agent via Reach." },
+    "run_harness": { "name": "Run harness", "description": "Execute a harness pack (best-effort)." },
+    "catalog_list": { "name": "Catalog list", "description": "List catalog entries by kind." },
+    "catalog_get": { "name": "Catalog get", "description": "Get one catalog entry." },
+    "catalog_upsert": { "name": "Catalog upsert", "description": "Create or update a catalog YAML entry." },
+    "catalog_delete": { "name": "Catalog delete", "description": "Delete a user catalog entry." },
+    "catalog_enable": { "name": "Catalog enable", "description": "Enable or disable a catalog entry." }
+  }
+}

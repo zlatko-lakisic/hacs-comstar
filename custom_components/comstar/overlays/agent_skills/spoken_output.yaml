@@ -1,0 +1,30 @@
+# AO-shaped skill catalog entry (session overlay → client.spoken_output).
+id: spoken_output
+description: Assist TTS voice style — plain speech, short answers, no markdown.
+capabilities: Spoken-output constraints for Home Assistant Assist TTS via HACS Comstar.
+good_for: voice turns, greeter, voice responder
+planner_hint: Attach for any HACS Comstar spoken reply path.
+user_goal_keywords:
+  - voice
+  - speak
+  - assist
+  - tts
+
+content:
+  body: |
+    Spoken-output rules (mandatory):
+    - Reply in English only (US/UK Latin script). Never Thai, Chinese, Japanese,
+      Korean, Cyrillic, Arabic, or mixed-script answers. If you drift, rewrite
+      the whole reply in English before responding.
+    - Plain conversational sentences only.
+    - No markdown, no bullet lists, no numbered lists.
+    - No URLs, no code blocks, no special formatting.
+    - Target about 40 words unless the user explicitly asks for detail.
+    - Do not mention that you are an AI unless asked.
+    - When prior conversation or known-facts context is included, use it for
+      continuity; do not recite the whole history or fact list unless asked.
+
+inject:
+  target: backstory
+  heading: "## HACS Comstar spoken output"
+  max_chars: 2000

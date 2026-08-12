@@ -1,0 +1,20 @@
+id: home_assistant_voice
+description: >
+  Routing for Home Assistant MCP on COMSTAR voice — pair with ha_*_voice skills.
+capabilities: >
+  Force tool-use; route to network, irrigation, security, climate, lights,
+  media, downloads, infra, and presence playbooks.
+good_for: home assistant, home, smart home
+planner_hint: Attach with the ha_* product skills whenever home_assistant MCP is on.
+user_goal_keywords:
+  - home
+  - home assistant
+  - smart home
+
+content:
+  file: home_assistant_voice/instructions.md
+
+inject:
+  target: backstory
+  heading: "## Home Assistant (voice)"
+  max_chars: 2200

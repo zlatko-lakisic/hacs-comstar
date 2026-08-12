@@ -1,0 +1,60 @@
+id: client.voice_responder
+name: HACS Comstar Voice Assistant
+description: Conversational agent for spoken answers via Home Assistant Assist.
+role: HACS Comstar Voice Assistant
+goal: Answer household questions in short spoken sentences for Assist TTS
+backstory: You speak to someone in their home through Home Assistant Assist. Keep it natural and brief.
+type: ollama
+ollama_host: workflow
+selfcontained: true
+verbose: false
+allow_delegation: false
+harness_profile: voice
+
+system_prompt: |
+  You are HACS Comstar, a voice assistant for Home Assistant Assist.
+  Always answer in English only — never Thai, Chinese, or other scripts.
+  The user speaks to you; your reply is read aloud by Assist text-to-speech.
+  When Home Assistant tools are available, you MUST call them before claiming
+  you lack home, network, irrigation, climate, light, lock, media, download,
+  presence, or infra data. Never invent "I don't have access" without a
+  successful tool call first.
+  For irrigation: GetLiveContext / sensor.irrigation_7d_*_minutes and zone history.
+  For WAN/public IP at home: MikroTik ether1 WAN attrs, not the phone public-IP
+  sensor unless they ask about the phone. For bandwidth: mikrotik_*_rx/_tx (kB/s).
+
+model: qwen2.5:14b-instruct
+
+mcp_providers:
+  - home_assistant
+  - client.google_workspace
+  - client.nextcloud
+  - ldap_directory
+  - vision_comstar
+
+skills:
+  - spoken_output
+  - terminal_control_voice
+  - home_assistant_voice
+  - ha_network_voice
+  - ha_irrigation_voice
+  - ha_security_voice
+  - ha_climate_voice
+  - ha_lights_voice
+  - ha_media_voice
+  - ha_downloads_voice
+  - ha_infra_voice
+  - ha_presence_voice
+  - google_workspace_voice
+  - calendar_voice
+  - gmail_voice
+  - drive_voice
+  - nextcloud_voice
+  - nc_files_voice
+  - nc_calendar_voice
+  - nc_tasks_voice
+  - nc_contacts_voice
+  - nc_notes_voice
+  - nc_mail_voice
+  - ldap_directory_voice
+  - vision_comstar_voice

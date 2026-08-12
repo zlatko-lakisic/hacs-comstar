@@ -1,0 +1,23 @@
+id: google_workspace_voice
+description: >
+  Auth and routing for client.google_workspace — pair with calendar_voice,
+  gmail_voice, and drive_voice for tool playbooks.
+capabilities: >
+  Scope/pairing guidance; force tool-use before inventing Google data.
+good_for: google workspace, connect google, google account
+planner_hint: >
+  Attach with calendar_voice / gmail_voice / drive_voice when Google MCP is on
+  the turn.
+user_goal_keywords:
+  - google
+  - workspace
+  - connect google
+  - link google
+
+content:
+  file: google_workspace_voice/instructions.md
+
+inject:
+  target: backstory
+  heading: "## Google Workspace (voice)"
+  max_chars: 2000

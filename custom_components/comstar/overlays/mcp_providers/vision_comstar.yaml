@@ -1,0 +1,24 @@
+# COMSTAR vision MCP — AO catalog (hosted on Ada / AI server).
+# Co-located with CodeProject.AI — not the Pi reverse tunnel (CONTRACTS §5).
+#
+# URL MUST use a letter-leading hostname. Raw IPs (10.0.10.16 / 127.0.0.1)
+# mint illegal OpenAI tool names like 10_0_10_16_8793_mcp_who_visited.
+id: vision_comstar
+description: CodeProject.AI presence/scene plus Frigate visitor history for COMSTAR
+capabilities: >
+  who_is_present, describe_view, check_camera against CPAI;
+  list_person_visits, describe_visit, who_visited against Frigate (+ HA LLM Vision
+  for unrecognized people).
+  Needs a JPEG frame feed for live tools; Pi face engage stays on the bridge
+  vision poller.
+good_for: >
+  who is here, camera, scene, objects, presence at terminal,
+  who was in the driveway, visitors today
+planner_hint: >
+  Use for orchestrator-side "who is present" / scene questions and historical
+  visitor summaries via who_visited. Do not use for session identity (that is
+  the Pi face → directory resolve path).
+
+guest_allowed: false
+streamable_http:
+  url: "http://nvr.mostardesigns.com:8793/mcp"

@@ -1,0 +1,1 @@
+{"path": "custom_components/comstar/ao_reach/catalog_errors.py", "content": "\"\"\"Catalog validation errors (placeholder for parity with Dart SDK).\"\"\"\n\n\nclass CatalogError(Exception):\n    \"\"\"Raised when overlay/catalog YAML is invalid.\"\"\"\n", "description": "Install HACS Comstar ao_reach/catalog_errors.py"}

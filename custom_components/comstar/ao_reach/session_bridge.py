@@ -18,7 +18,12 @@ import aiohttp
 from .connection_config import ReachConnectionConfig, reach_ws_uri
 from .local_mcp_host import LocalMcpHost
 from .mcp_bootstrap import EmptySessionMcpBootstrap, SessionMcpBootstrap
-from .mtls import ReachMtlsConfig, assert_reach_mtls_uses_tls, load_reach_mtls_material
+from .mtls import (
+    ReachMtlsConfig,
+    assert_reach_mtls_uses_tls,
+    build_reach_ssl_context,
+    load_reach_mtls_material,
+)
 from .overlay_packer import OverlayPacker
 from .speech_client import SpeechCapabilities, SpeechClient
 
@@ -157,8 +162,8 @@ class SessionBridge:
                     material.client_key_pem, encoding="utf-8"
                 )
                 (material_path / "ca.pem").write_text(material.ca_pem, encoding="utf-8")
-            ssl_ctx = ssl.create_default_context(cafile=str(material_path / "ca.pem"))
-            ssl_ctx.load_cert_chain(
+            ssl_ctx = build_reach_ssl_context(
+                cafile=str(material_path / "ca.pem"),
                 certfile=str(material_path / "cert.pem"),
                 keyfile=str(material_path / "key.pem"),
             )
@@ -549,8 +554,8 @@ async def probe_health(base_url: str, mtls: ReachMtlsConfig | None = None, timeo
         from pathlib import Path
 
         if material.dir:
-            ssl_ctx = ssl.create_default_context(cafile=str(Path(material.dir) / "ca.pem"))
-            ssl_ctx.load_cert_chain(
+            ssl_ctx = build_reach_ssl_context(
+                cafile=str(Path(material.dir) / "ca.pem"),
                 certfile=str(Path(material.dir) / "cert.pem"),
                 keyfile=str(Path(material.dir) / "key.pem"),
             )

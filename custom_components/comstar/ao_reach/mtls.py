@@ -3,8 +3,29 @@
 from __future__ import annotations
 
 import json
+import ssl
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def build_reach_ssl_context(
+    *,
+    cafile: str,
+    certfile: str,
+    keyfile: str,
+) -> ssl.SSLContext:
+    """Client TLS for AO Reach.
+
+    Pins the AO CA and presents the enrolled client cert. Clears
+    ``VERIFY_X509_STRICT`` when present (Python 3.13+/OpenSSL 3.2+) so older
+    lab CAs without Authority Key Identifier still verify.
+    """
+    ctx = ssl.create_default_context(cafile=cafile)
+    strict = getattr(ssl, "VERIFY_X509_STRICT", 0)
+    if strict:
+        ctx.verify_flags &= ~strict
+    ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+    return ctx
 
 
 @dataclass

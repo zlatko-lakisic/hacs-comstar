@@ -1,0 +1,1 @@
+{"path": "custom_components/comstar/catalog/__init__.py", "description": "Install HACS Comstar catalog/__init__.py", "content": "\"\"\"Catalog package.\"\"\"\n\nfrom .store import CatalogStore\n\n__all__ = [\"CatalogStore\"]\n"}

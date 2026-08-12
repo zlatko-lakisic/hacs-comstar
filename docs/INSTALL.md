@@ -6,7 +6,7 @@
 - AO engine with `AGENTIC_SERVE_SESSION_OVERLAY=1`
 - For tunnels: `AGENTIC_SERVE_MCP_TUNNEL=1`
 - For PreferReach speech: `AGENTIC_SPEECH_ENABLED=1` + sidecars
-- `openssl` on the HA host PATH (mTLS enroll)
+- mTLS enroll uses `openssl` when available, otherwise the Core image’s `cryptography` package
 - `npx` on PATH when enabling tunnel MCPs
 
 ## Mint token

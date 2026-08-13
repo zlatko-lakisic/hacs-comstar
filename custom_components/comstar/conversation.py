@@ -15,6 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .identity import resolve_identity
 from .intents import resolve_local_intent
+from .spoken_reply import unwrap_spoken_reply
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,7 +100,8 @@ class ComstarConversationEntity(
                 text=text,
                 mcp_provider_ids=local.mcp_allowlist,
             )
-            reply = str(result.get("text") or "").strip() or "I could not get an answer."
+            reply = str(result.get("text") or "").strip()
+            reply = unwrap_spoken_reply(reply).strip() or "I could not get an answer."
         except Exception as exc:  # noqa: BLE001
             _LOGGER.exception("Comstar direct_agent failed")
             reply = f"Sorry, Comstar hit an error: {exc}"

@@ -41,6 +41,7 @@ class HealthService:
             "registered_mcps": list(self.sessions.bridge.registered_mcp_ids),
             "tunnels_enabled": list(self.sessions.bridge.active_tunnel_bare_ids),
             "client_mcp_warnings": list(self.sessions.bridge.client_mcp_warnings),
+            "register_progress": self.sessions.bridge.register_progress,
         }
         self.status = status
         self._update(status)

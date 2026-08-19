@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import ssl
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 def build_reach_ssl_context(
@@ -13,19 +15,34 @@ def build_reach_ssl_context(
     cafile: str,
     certfile: str,
     keyfile: str,
+    check_hostname: bool = True,
 ) -> ssl.SSLContext:
     """Client TLS for AO Reach.
 
     Pins the AO CA and presents the enrolled client cert. Clears
     ``VERIFY_X509_STRICT`` when present (Python 3.13+/OpenSSL 3.2+) so older
-    lab CAs without Authority Key Identifier still verify.
+    lab CAs without Authority Key Identifier still verify. Hostname binding can
+    be disabled for IP-literal endpoints whose cert carries the address only as
+    a dNSName SAN (Python matches IP literals against iPAddress SANs only).
     """
     ctx = ssl.create_default_context(cafile=cafile)
     strict = getattr(ssl, "VERIFY_X509_STRICT", 0)
     if strict:
         ctx.verify_flags &= ~strict
+    if not check_hostname:
+        ctx.check_hostname = False
     ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
     return ctx
+
+
+def host_is_ip_literal(base_url: str) -> bool:
+    """True when the URL host is a bare IPv4/IPv6 address (no DNS name)."""
+    host = urlparse(base_url).hostname or ""
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
 
 
 @dataclass

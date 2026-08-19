@@ -22,9 +22,11 @@ from .mtls import (
     ReachMtlsConfig,
     assert_reach_mtls_uses_tls,
     build_reach_ssl_context,
+    host_is_ip_literal,
     load_reach_mtls_material,
 )
 from .overlay_packer import OverlayPacker
+from .run_status import ReachRunError, ReachRunStatus
 from .speech_client import SpeechCapabilities, SpeechClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +45,9 @@ class _PendingDirectRun:
     question_id: str
     stdout: list[str] = field(default_factory=list)
     last_error: str | None = None
+    last_error_code: str | None = None
+    last_status: Any = None
+    on_status: Callable[[Any], None] | None = None
     done: asyncio.Future = field(default_factory=lambda: asyncio.get_event_loop().create_future())
 
 
@@ -70,6 +75,7 @@ class SessionBridge:
         self.error: str | None = None
         self.session_overlay = False
         self.mcp_tunnel = False
+        self.custom_tool_sandbox = False
         self.speech: SpeechCapabilities | None = None
         self.registered_agent_ids: list[str] = []
         self.registered_mcp_ids: list[str] = []
@@ -82,6 +88,7 @@ class SessionBridge:
         self._last_overlay_root: str | None = None
         self._last_bootstrap: SessionMcpBootstrap = EmptySessionMcpBootstrap()
         self._status_callbacks: list[Callable[[SessionBridge], None]] = []
+        self._run_status_callbacks: list[Callable[[ReachRunStatus], None]] = []
 
     @property
     def is_active(self) -> bool:
@@ -98,12 +105,30 @@ class SessionBridge:
     def on_status(self, callback: Callable[[SessionBridge], None]) -> None:
         self._status_callbacks.append(callback)
 
+    def on_run_status(self, callback: Callable[[ReachRunStatus], None]) -> None:
+        """Listen for all chat / direct_agent status frames (demux via question_id)."""
+        self._run_status_callbacks.append(callback)
+
     def _emit(self) -> None:
         for cb in list(self._status_callbacks):
             try:
                 cb(self)
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("status callback failed")
+
+    def _emit_run_status(self, status: ReachRunStatus, run: _PendingDirectRun | None) -> None:
+        if run is not None:
+            run.last_status = status
+            if run.on_status:
+                try:
+                    run.on_status(status)
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("run status callback failed")
+        for cb in list(self._run_status_callbacks):
+            try:
+                cb(status)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("run status listener failed")
 
     async def start(
         self,
@@ -166,6 +191,7 @@ class SessionBridge:
                 cafile=str(material_path / "ca.pem"),
                 certfile=str(material_path / "cert.pem"),
                 keyfile=str(material_path / "key.pem"),
+                check_hostname=not host_is_ip_literal(config.base_url),
             )
 
         connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
@@ -181,6 +207,7 @@ class SessionBridge:
         self._hello_wait = None
         self.session_overlay = bool(hello.get("sessionOverlay"))
         self.mcp_tunnel = bool(hello.get("mcpTunnel"))
+        self.custom_tool_sandbox = bool(hello.get("customToolSandbox"))
         if not self.session_overlay:
             raise RuntimeError(
                 "AO session overlay disabled — set AGENTIC_SERVE_SESSION_OVERLAY=1"
@@ -199,22 +226,36 @@ class SessionBridge:
                 speech_token=config.speech_token,
             )
 
-        boot = await mcp_bootstrap.prepare(self._mcp_host, mcp_tunnel=self.mcp_tunnel)
+        from .hybrid_mcp_bootstrap import HybridSessionMcpBootstrap
+
+        if isinstance(mcp_bootstrap, HybridSessionMcpBootstrap):
+            mcp_bootstrap.ao_custom_tool_sandbox = self.custom_tool_sandbox
+
+        boot = await mcp_bootstrap.prepare(
+            self._mcp_host, mcp_tunnel=self.mcp_tunnel, config=config
+        )
         self.client_mcp_warnings = list(boot.warnings)
         self.active_tunnel_bare_ids = list(boot.active_tunnel_bare_ids)
 
         pack = self._packer.pack(overlay_root, extra_mcps=boot.mcps)
         self._ack_wait = asyncio.get_event_loop().create_future()
-        await self._send(
-            {
-                "type": "session_overlay_register",
-                "appId": config.app_id,
-                "ttlSeconds": config.ttl_seconds,
-                "agents": pack.agents,
-                "mcps": pack.mcps,
-                "skills": pack.skills,
-            }
-        )
+        payload: dict[str, Any] = {
+            "type": "session_overlay_register",
+            "appId": config.app_id,
+            "ttlSeconds": config.ttl_seconds,
+            "agents": pack.agents,
+            "mcps": pack.mcps,
+            "skills": pack.skills,
+        }
+        if config.session_env:
+            payload["env"] = dict(config.session_env)
+        if config.allowed_agent_provider_ids:
+            payload["allowedAgentProviderIds"] = list(config.allowed_agent_provider_ids)
+        if config.allowed_mcp_provider_ids:
+            payload["allowedMcpProviderIds"] = list(config.allowed_mcp_provider_ids)
+        if config.allowed_skill_ids:
+            payload["allowedSkillIds"] = list(config.allowed_skill_ids)
+        await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
         if ack.get("type") == "session_overlay_denied" or ack.get("type") == "error":
@@ -248,20 +289,28 @@ class SessionBridge:
         if not self.is_active or not self._last_config or not self._last_overlay_root:
             raise RuntimeError("Session bridge is not active")
         boot = await self._last_bootstrap.prepare(
-            self._mcp_host, mcp_tunnel=self.mcp_tunnel
+            self._mcp_host, mcp_tunnel=self.mcp_tunnel, config=self._last_config
         )
         pack = self._packer.pack(self._last_overlay_root, extra_mcps=boot.mcps)
         self._ack_wait = asyncio.get_event_loop().create_future()
-        await self._send(
-            {
-                "type": "session_overlay_register",
-                "appId": self._last_config.app_id,
-                "ttlSeconds": self._last_config.ttl_seconds,
-                "agents": pack.agents,
-                "mcps": pack.mcps,
-                "skills": pack.skills,
-            }
-        )
+        cfg = self._last_config
+        payload: dict[str, Any] = {
+            "type": "session_overlay_register",
+            "appId": cfg.app_id,
+            "ttlSeconds": cfg.ttl_seconds,
+            "agents": pack.agents,
+            "mcps": pack.mcps,
+            "skills": pack.skills,
+        }
+        if cfg.session_env:
+            payload["env"] = dict(cfg.session_env)
+        if cfg.allowed_agent_provider_ids:
+            payload["allowedAgentProviderIds"] = list(cfg.allowed_agent_provider_ids)
+        if cfg.allowed_mcp_provider_ids:
+            payload["allowedMcpProviderIds"] = list(cfg.allowed_mcp_provider_ids)
+        if cfg.allowed_skill_ids:
+            payload["allowedSkillIds"] = list(cfg.allowed_skill_ids)
+        await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
         if ack.get("type") in ("session_overlay_denied", "error"):
@@ -279,9 +328,18 @@ class SessionBridge:
         text: str,
         context: str = "",
         question_id: str | None = None,
+        priority: str | int | None = None,
         mcp_provider_ids: list[str] | None = None,
+        images: list[dict[str, Any]] | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 300.0,
     ) -> dict[str, Any]:
+        """Run a single agent (`type: direct_agent`).
+
+        Optional ``images`` — ``[{mimeType, dataBase64, name?}, ...]`` in display
+        order. AO routes those turns to a vision model; engines that predate the
+        multimodal protocol ignore the field and answer from ``text`` alone.
+        """
         if not self.is_active or self._ws is None:
             raise RuntimeError("Session bridge is not active — cannot run client.* agents")
         prefix = self._last_config.question_id_prefix if self._last_config else "reach"
@@ -289,7 +347,9 @@ class SessionBridge:
         if qid in self._pending_runs:
             raise RuntimeError(f"direct_agent already in flight for questionId={qid}")
         loop = asyncio.get_event_loop()
-        pending = _PendingDirectRun(question_id=qid, done=loop.create_future())
+        pending = _PendingDirectRun(
+            question_id=qid, done=loop.create_future(), on_status=on_status
+        )
         self._pending_runs[qid] = pending
         payload: dict[str, Any] = {
             "type": "direct_agent",
@@ -298,14 +358,120 @@ class SessionBridge:
             "context": context,
             "questionId": qid,
         }
+        if self._last_config is not None:
+            payload["appId"] = self._last_config.app_id
         if mcp_provider_ids:
             payload["mcpProviderIds"] = mcp_provider_ids
+        if images:
+            payload["images"] = list(images)
+        if priority is not None:
+            payload["priority"] = priority
         await self._send(payload)
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
         except TimeoutError:
             self._pending_runs.pop(qid, None)
             raise TimeoutError(f"direct_agent timed out for {agent_provider_id} ({qid})") from None
+
+    async def chat(
+        self,
+        *,
+        text: str,
+        question_id: str | None = None,
+        priority: str | int | None = None,
+        selected_agent_provider_ids: list[str] | None = None,
+        run_mode: str | None = None,
+        session_id: str | None = None,
+        images: list[dict[str, Any]] | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
+        timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """Run AO dynamic planning (`type: chat`) on the owning session WebSocket.
+
+        Optional ``images`` — see [direct_agent] multimodal extension.
+        """
+        if not self.is_active or self._ws is None:
+            raise RuntimeError("Session bridge is not active — cannot run dynamic chat")
+        cfg = self._last_config
+        prefix = cfg.question_id_prefix if cfg else "reach"
+        qid = (question_id or "").strip() or f"{prefix}-{int(time.time() * 1_000_000)}"
+        if qid in self._pending_runs:
+            raise RuntimeError(f"chat already in flight for questionId={qid}")
+        mode = (run_mode or "").strip() or (cfg.default_run_mode if cfg else "dynamic")
+        loop = asyncio.get_event_loop()
+        pending = _PendingDirectRun(
+            question_id=qid, done=loop.create_future(), on_status=on_status
+        )
+        self._pending_runs[qid] = pending
+        payload: dict[str, Any] = {
+            "type": "chat",
+            "text": text,
+            "questionId": qid,
+            "runMode": mode,
+        }
+        if cfg is not None:
+            payload["appId"] = cfg.app_id
+        if session_id and str(session_id).strip():
+            payload["sessionId"] = str(session_id).strip()
+        if selected_agent_provider_ids:
+            payload["selectedAgentProviderIds"] = list(selected_agent_provider_ids)
+        if images:
+            payload["images"] = list(images)
+        if priority is not None:
+            payload["priority"] = priority
+        await self._send(payload)
+        try:
+            return await asyncio.wait_for(pending.done, timeout=timeout)
+        except TimeoutError:
+            self._pending_runs.pop(qid, None)
+            raise TimeoutError(f"chat timed out ({qid})") from None
+
+    async def cancel(self, question_id: str) -> None:
+        """Ask the engine to cancel one in-flight chat / direct_agent by questionId.
+
+        Does not close the WebSocket or clear the session overlay. The pending
+        future completes with ReachRunError (code cancelled) when AO ends the run.
+        """
+        qid = (question_id or "").strip()
+        if not qid:
+            raise ValueError("cancel requires a non-empty question_id")
+        if not self.is_active or self._ws is None:
+            raise RuntimeError("Session bridge is not active — cannot cancel")
+        await self._send({"type": "cancel", "questionId": qid})
+        run = self._pending_runs.get(qid)
+        if run is not None and not run.done.done():
+            run.last_error = "Cancelled."
+            run.last_error_code = "cancelled"
+
+    async def cancel_run(self, question_id: str) -> None:
+        """Alias for [cancel]."""
+        await self.cancel(question_id)
+
+    async def run_dynamic(
+        self,
+        *,
+        text: str,
+        question_id: str | None = None,
+        priority: str | int | None = None,
+        selected_agent_provider_ids: list[str] | None = None,
+        run_mode: str | None = None,
+        session_id: str | None = None,
+        images: list[dict[str, Any]] | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
+        timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """Alias for [chat] (plan + ephemeral crew)."""
+        return await self.chat(
+            text=text,
+            question_id=question_id,
+            priority=priority,
+            selected_agent_provider_ids=selected_agent_provider_ids,
+            run_mode=run_mode,
+            session_id=session_id,
+            images=images,
+            on_status=on_status,
+            timeout=timeout,
+        )
 
     async def _read_loop(self) -> None:
         assert self._ws is not None
@@ -351,6 +517,15 @@ class SessionBridge:
                     self.register_progress = re.sub(r"^\(engine\)\s*", "", text)
                     self._emit()
             self._on_run_chunk(msg)
+        elif typ == "status":
+            if self._ack_wait and not self._ack_wait.done():
+                msg_text = str(msg.get("message") or "").strip()
+                if msg_text:
+                    self.register_progress = msg_text
+                    self._emit()
+            self._on_run_status(msg)
+        elif typ == "run_start":
+            self._on_run_start(msg)
         elif typ == "run_end":
             self._on_run_end(msg)
         elif typ == "error":
@@ -364,6 +539,30 @@ class SessionBridge:
                 self._on_run_error(msg)
         elif typ == "mcp_tunnel_request":
             asyncio.create_task(self._handle_tunnel_request(msg))
+
+    def _on_run_start(self, msg: dict[str, Any]) -> None:
+        qid = msg.get("question_id") or msg.get("questionId")
+        if not qid:
+            return
+        run = self._pending_runs.get(str(qid))
+        if not run:
+            return
+        self._emit_run_status(
+            ReachRunStatus(
+                processing=True,
+                phase="starting",
+                message="Starting your request…",
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
+            ),
+            run,
+        )
+
+    def _on_run_status(self, msg: dict[str, Any]) -> None:
+        status = ReachRunStatus.from_json(msg)
+        run = self._pending_runs.get(status.question_id) if status.question_id else None
+        self._emit_run_status(status, run)
 
     def _on_run_chunk(self, msg: dict[str, Any]) -> None:
         qid = msg.get("question_id") or msg.get("questionId")
@@ -380,8 +579,19 @@ class SessionBridge:
         if not qid:
             return
         run = self._pending_runs.get(str(qid))
-        if run:
-            run.last_error = str(msg.get("message") or "AO error")
+        if not run:
+            return
+        status = ReachRunStatus.from_json(
+            {
+                **msg,
+                "processing": False,
+                "phase": msg.get("phase") or "error",
+                "message": msg.get("message") or "AO error",
+            }
+        )
+        run.last_error = status.message
+        run.last_error_code = status.code
+        self._emit_run_status(status, run)
 
     def _on_run_end(self, msg: dict[str, Any]) -> None:
         qid = msg.get("question_id") or msg.get("questionId")
@@ -394,11 +604,36 @@ class SessionBridge:
         fallback = str(msg.get("text") or "")
         ok = msg.get("ok") is True
         err = msg.get("error") or run.last_error
+        code = msg.get("code") or run.last_error_code
         if not ok:
-            run.done.set_exception(
-                RuntimeError(err if err else "direct_agent failed (run_end ok=false)")
+            cancelled = str(code or "") == "cancelled"
+            status = ReachRunStatus(
+                processing=False,
+                phase="cancelled" if cancelled else "error",
+                message=(
+                    str(err)
+                    if err
+                    else ("Cancelled." if cancelled else "Request failed")
+                ),
+                code=str(code) if code else None,
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
             )
+            self._emit_run_status(status, run)
+            run.done.set_exception(ReachRunError.from_status(status))
             return
+        self._emit_run_status(
+            ReachRunStatus(
+                processing=False,
+                phase="done",
+                message="Done.",
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
+            ),
+            run,
+        )
         run.done.set_result(
             {
                 "ok": True,
@@ -558,6 +793,7 @@ async def probe_health(base_url: str, mtls: ReachMtlsConfig | None = None, timeo
                 cafile=str(Path(material.dir) / "ca.pem"),
                 certfile=str(Path(material.dir) / "cert.pem"),
                 keyfile=str(Path(material.dir) / "key.pem"),
+                check_hostname=not host_is_ip_literal(base),
             )
     connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
     async with aiohttp.ClientSession(connector=connector) as session:

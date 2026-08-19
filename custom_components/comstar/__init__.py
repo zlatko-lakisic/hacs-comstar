@@ -99,6 +99,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         status_holder["status"] = status
         hass.bus.async_fire(f"{DOMAIN}_status", status)
 
+    def _on_run_status(run_status: Any) -> None:
+        payload = {
+            "message": run_status.message,
+            "processing": run_status.processing,
+            "phase": run_status.phase,
+            "queue_phase": run_status.queue_phase,
+            "queue_position": run_status.queue_position,
+            "queue_length": run_status.queue_length,
+            "queue_priority": run_status.queue_priority,
+            "queue_priority_label": run_status.queue_priority_label,
+            "elapsed_ms": run_status.elapsed_ms,
+        }
+        status_holder["run_status"] = payload
+        hass.bus.async_fire(f"{DOMAIN}_run_status", payload)
+
+    sessions.on_run_status(_on_run_status)
+
+    def _on_bridge_status(_bridge: Any) -> None:
+        payload = {
+            "state": _bridge.state.value,
+            "register_progress": _bridge.register_progress,
+            "registered_agents": list(_bridge.registered_agent_ids),
+            "registered_mcps": list(_bridge.registered_mcp_ids),
+        }
+        status_holder["bridge"] = payload
+        hass.bus.async_fire(f"{DOMAIN}_bridge_status", payload)
+
+    sessions.bridge.on_status(_on_bridge_status)
+
     health = HealthService(
         pairing=pairing, sessions=sessions, update_callback=_on_status
     )

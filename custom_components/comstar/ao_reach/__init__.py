@@ -6,7 +6,7 @@ heavy deps like aiohttp during Home Assistant config-flow discovery.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.15.0"
 
 __all__ = [
     "EmptySessionMcpBootstrap",
@@ -14,10 +14,16 @@ __all__ = [
     "McpSessionSpec",
     "McpSessionTransport",
     "OverlayPacker",
+    "ReachCatalog",
+    "ReachCatalogClient",
+    "ReachCatalogEntry",
+    "ReachCatalogSecretField",
     "ReachConnectionConfig",
     "ReachMtlsConfig",
     "ReachMtlsEnroller",
     "ReachMtlsMaterial",
+    "ReachRunError",
+    "ReachRunStatus",
     "SessionBridge",
     "SessionBridgeState",
     "SessionMcpBootstrap",
@@ -40,7 +46,13 @@ __all__ = [
 def __getattr__(name: str):
     """Lazy attribute access so light imports stay dependency-free."""
     mapping = {
+        "ReachCatalog": (".catalog_client", "ReachCatalog"),
+        "ReachCatalogClient": (".catalog_client", "ReachCatalogClient"),
+        "ReachCatalogEntry": (".catalog_client", "ReachCatalogEntry"),
+        "ReachCatalogSecretField": (".catalog_client", "ReachCatalogSecretField"),
         "ReachConnectionConfig": (".connection_config", "ReachConnectionConfig"),
+        "ReachRunError": (".run_status", "ReachRunError"),
+        "ReachRunStatus": (".run_status", "ReachRunStatus"),
         "ensure_reach_identity": (".connection_config", "ensure_reach_identity"),
         "normalize_reach_app_id": (".connection_config", "normalize_reach_app_id"),
         "reach_ws_uri": (".connection_config", "reach_ws_uri"),

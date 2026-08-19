@@ -40,11 +40,34 @@ class ReachConnectionConfig:
     speech_stt_base_url_override: str | None = None
     speech_tts_base_url_override: str | None = None
     mtls: ReachMtlsConfig | None = None
+    dynamic_planning: bool = False
+    default_run_mode: str = "dynamic"
+    session_env: dict[str, str] | None = None
+    allowed_agent_provider_ids: list[str] | None = None
+    allowed_mcp_provider_ids: list[str] | None = None
+    allowed_skill_ids: list[str] | None = None
+    deploy_to_ao_sandbox: bool = False
 
     def __post_init__(self) -> None:
         self.app_id = normalize_reach_app_id(self.app_id)
         self.base_url = self.base_url.rstrip("/")
         self.headers = dict(self.headers)
+        mode = (self.default_run_mode or "dynamic").strip().lower()
+        self.default_run_mode = mode if mode in ("dynamic", "dynamic-iterative") else "dynamic"
+        if self.session_env is not None:
+            self.session_env = {str(k): str(v) for k, v in dict(self.session_env).items() if str(k).strip()}
+        if self.allowed_agent_provider_ids is not None:
+            self.allowed_agent_provider_ids = [
+                str(x).strip() for x in self.allowed_agent_provider_ids if str(x).strip()
+            ]
+        if self.allowed_mcp_provider_ids is not None:
+            self.allowed_mcp_provider_ids = [
+                str(x).strip() for x in self.allowed_mcp_provider_ids if str(x).strip()
+            ]
+        if self.allowed_skill_ids is not None:
+            self.allowed_skill_ids = [
+                str(x).strip() for x in self.allowed_skill_ids if str(x).strip()
+            ]
 
     def copy_with(self, **kwargs: object) -> ReachConnectionConfig:
         return replace(self, **kwargs)  # type: ignore[arg-type]

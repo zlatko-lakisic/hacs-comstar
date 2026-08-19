@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .ao_reach.connection_config import ReachConnectionConfig
+from .ao_reach.run_status import ReachRunStatus
 from .ao_reach.session_bridge import SessionBridge, SessionBridgeState
 from .identity import ComstarIdentity, filter_mcp_allowlist
 from .mcp_bootstrap import ComstarMcpBootstrap
@@ -47,6 +48,11 @@ class ReachSessionManager:
         self.memory = ConversationMemory()
         self.durable = DurableMemory()
         self.connected = False
+        self._run_status_callback: Callable[[ReachRunStatus], None] | None = None
+
+    def on_run_status(self, callback: Callable[[ReachRunStatus], None]) -> None:
+        """Register callback for AO run queue / progress status frames."""
+        self._run_status_callback = callback
 
     def _config_for(self, identity: ComstarIdentity) -> ReachConnectionConfig:
         headers = {
@@ -115,6 +121,8 @@ class ReachSessionManager:
             text=text,
             context=context,
             mcp_provider_ids=allow or None,
+            priority="realtime",
+            on_status=self._run_status_callback,
         )
         reply = str(result.get("text") or "")
         self.memory.add(identity.session_id, "assistant", reply)
